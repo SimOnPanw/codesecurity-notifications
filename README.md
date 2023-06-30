@@ -14,5 +14,6 @@ export PRISMA_SECRET_KEY="__REDACTED__"
 ## Run the script
 
 ```console
+pip install -r requirements.txt
 python3 add_notifications.py -r repo1 repo2 --severity <SEVERITY> --integration-name <INTEGRATION_NAME>
 ```

@@ -33,7 +33,13 @@ def set_code_security_notification(base_url, token, existing_notifications):
         headers = {"content-type": "application/json; charset=UTF-8", "Authorization": f"Bearer {token}"}
         parameters = {"scheme": {"pcNotifications": existing_notifications}, "type": "pcNotifications"}
         response = requests.post(url, headers=headers, data=json.dumps(parameters))
-        print(f"Response: {response}")
+
+        # Check the status code
+        if response.status_code == 200:
+            print("Request was successful!")
+        else:
+            print(f"Request failed with status code: {response.status_code}")
+            
     except Exception as e:
         print(f"Error in set_code_security_notification: {e}")
 
