@@ -44,7 +44,7 @@ def set_code_security_notification(base_url, token, existing_notifications):
         print(f"Error in set_code_security_notification: {e}")
 
 
-def add_section(existing_notifications, repos, severity_level, integration_id, is_default=False):
+def add_section(existing_notifications, repos, severity_level, integration_id, template_id, is_default=False):
     try:
         new_section = {
             "repos": repos,
@@ -56,6 +56,8 @@ def add_section(existing_notifications, repos, severity_level, integration_id, i
             },
             "isDefault": is_default,
         }
+        if template_id is not None:
+            new_section["rule"]["pcNotificationIntegrations"][0]["templateId"] = template_id
         if existing_notifications and "sections" in existing_notifications:
             existing_notifications["sections"].append(new_section)
         return existing_notifications
@@ -85,6 +87,15 @@ def get_integration_id(base_url, token, prisma_id, integration_name):
         for integration in data:
             if integration.get("name") == integration_name:
                 return integration.get("id")
+        
+        ## Check for notification template
+        url = f"https://{base_url}/api/v1/tenant/{prisma_id}/template"
+        headers = {"content-type": "application/json; charset=UTF-8", "Authorization": "Bearer " + token}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        for template in data:
+            if template.get("name") == integration_name:
+                return template.get("id"), template.get("integrationId")
         # If the integration name is not found, raise an exception
         raise ValueError(f"Integration with name {integration_name} not found.")
     except Exception as e:
@@ -105,35 +116,32 @@ def login_saas(base_url, access_key, secret_key):
 
 
 def main(repositories, severity_level, integration_name):
-    try:
-        url = os.environ.get("PRISMA_API_URL")
-        identity = os.environ.get("PRISMA_ACCESS_KEY")
-        secret = os.environ.get("PRISMA_SECRET_KEY")
+    url = os.environ.get("PRISMA_API_URL")
+    identity = os.environ.get("PRISMA_ACCESS_KEY")
+    secret = os.environ.get("PRISMA_SECRET_KEY")
 
-        if not url or not identity or not secret:
-            print("Error: PRISMA_API_URL, PRISMA_ACCESS_KEY or PRISMA_SECRET_KEY environment variables are not set.")
-            return
+    if not url or not identity or not secret:
+        print("Error: PRISMA_API_URL, PRISMA_ACCESS_KEY or PRISMA_SECRET_KEY environment variables are not set.")
+        return
 
-        token = login_saas(url, identity, secret)
+    token = login_saas(url, identity, secret)
 
-        if token is None:
-            print("Error: Unable to authenticate.")
-            return
+    if token is None:
+        print("Error: Unable to authenticate.")
+        return
 
-        existing_notifications = get_code_security_notification(url, token)
+    existing_notifications = get_code_security_notification(url, token)
 
-        prisma_id = get_prisma_id(url, token)
-        try:
-            integration_id = get_integration_id(url, token, prisma_id, integration_name)
-        except Exception as e:
-            print(e)
-            return
-
-        existing_notifications = add_section(existing_notifications, repositories, severity_level, integration_id, False)
-        set_code_security_notification(url, token, existing_notifications)
-
-    except Exception as e:
-        print(f"Error in main function: {e}")
+    prisma_id = get_prisma_id(url, token)
+    integration_id = get_integration_id(url, token, prisma_id, integration_name)
+    result = get_integration_id(url, token, prisma_id, integration_name)
+    if isinstance(result, tuple):
+        template_id, integration_id = result
+        existing_notifications = add_section(existing_notifications, repositories, severity_level, integration_id, template_id, False)
+    else:
+        existing_notifications = add_section(existing_notifications, repositories, severity_level, result, None, False)
+    
+    set_code_security_notification(url, token, existing_notifications)
 
 
 if __name__ == "__main__":
